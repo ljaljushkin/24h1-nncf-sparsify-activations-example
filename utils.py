@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, PreTrainedModel
 import accelerate.hooks
 from datasets import load_dataset
 from lm_eval import evaluator
-from lm_eval.models.huggingface import AutoCausalLM, HuggingFaceAutoLM
+from lm_eval.models.huggingface import HFLM
 
 import nncf
 import nncf.experimental
@@ -23,7 +23,7 @@ import nncf.torch.quantization
 import nncf.torch.quantization.quantize_model
 
 
-class LMEvalModel(AutoCausalLM):
+class LMEvalModel(HFLM):
     def __init__(
         self,
         model: PreTrainedModel,
@@ -36,7 +36,7 @@ class LMEvalModel(AutoCausalLM):
         use_accelerate: Optional[bool] = False,
         device: Optional[Union[int, str]] = "cuda",
     ):
-        super(HuggingFaceAutoLM, self).__init__()  # do the BaseLM init
+        super(HFLM, self).__init__()  # do the BaseLM init
         self._batch_size = int(batch_size)
         self.max_batch_size = max_batch_size
         self._max_gen_toks = max_gen_toks
@@ -47,7 +47,7 @@ class LMEvalModel(AutoCausalLM):
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = self.max_length
 
-        self.model = model
+        self._model = model
         self.model.eval()
         torch.set_grad_enabled(False)
 
@@ -65,16 +65,17 @@ def run_lm_eval(model, tokenizer, model_id: str, device: str, task: str, limit=N
     max_length = 4096 if 'llama' in model_id.lower() else 2048
     print(f'Manually setting max_length={max_length} for {model_id} to avoid potential OOM.')
 
-    lm_eval_model = LMEvalModel(model, tokenizer, batch_size=1, max_length=max_length, device=device)
+    lm_eval_model = HFLM(model, tokenizer=tokenizer, batch_size=1, max_length=max_length, device=device)
     results = evaluator.simple_evaluate(
         model=lm_eval_model,
         tasks=[task],
         num_fewshot=0,
         batch_size=1,
-        no_cache=True,
         limit=limit,
         device=device,
     )
+    results["config"]["model_dtype"] = str(results["config"]["model_dtype"])
+    results.pop("samples", None)
     return results
 
 
@@ -180,7 +181,7 @@ def infer_layer_name(model_id, layer_type: str):
         author, model_id = model_id.split('/')[-2:]
     else:
         author, model_id = '', model_id
-    if 'llama' in model_id or 'mistral' in model_id:
+    if 'llama' in model_id or 'mistral' in model_id or 'phi' in model_id or 'qwen' in model_id:
         return f'.*{layer_type}_proj.*'
     elif 'mixtral' in model_id:
         if layer_type == 'up':

@@ -19,7 +19,7 @@ import nncf.torch.quantization
 import nncf.torch.quantization.quantize_model
 from nncf import CompressWeightsMode
 from optimum.exporters.openvino.convert import export_from_model
-from optimum.intel.openvino import OVModelForCausalLM, OVWeightQuantizationConfig, OVConfig
+from optimum.intel.openvino import OVModelForCausalLM
 
 from nncf.experimental.torch.sparsify_activations import TargetScope
 from utils import create_nncf_dataset_pt, create_nncf_dataset_ov, infer_layer_name, run_lm_eval, get_ov_input_shapes
@@ -39,6 +39,7 @@ class Args:
         'int4_asym',
         'int4',
     ]})
+    group_size: int = None
 
     ratio: float = None  # If set, will compress the model to this ratio.
 
@@ -54,7 +55,7 @@ class Args:
     # evaluate with lm-harness-evaluation
     eval_task: str = field(default='wikitext', metadata={
         'choices': ['wikitext', 'arc_easy', 'arc_challenge', 'boolq', "piqa",
-                    'lambada_openai', 'winogrande', 'sciq', 'hellaswag']
+                    'lambada_openai', 'winogrande', 'sciq', 'hellaswag', 'mmlu']
     })
     eval_limit: int = None  # If set, will only evaluate on this many samples. Useful for debugging.
     save_folder: str = './models'
@@ -75,9 +76,9 @@ def main(args: Args):
         )
 
         # Load model and dataset
-        torch_dtype = {'float16': torch.float16, 'float32': torch.float32}[args.torch_dtype]
+        # torch_dtype = {'float16': torch.float16, 'float32': torch.float32, 'bfloat16': torch.bfloat16}[args.torch_dtype]
         model = AutoModelForCausalLM.from_pretrained(
-            args.model_id, torch_dtype=torch_dtype,
+            args.model_id,
             device_map='auto' if args.device == 'cuda' else 'cpu',
             # HF uses sdpa by default since torch>=2.1.1, which is not well supported by OV export.
             attn_implementation="eager",
@@ -104,6 +105,14 @@ def main(args: Args):
                 quantization_config["bits"] = 4
                 if "sym" in args.compress_weights_mode:
                     quantization_config["group_size"] = 128
+                if args.group_size is not None:
+                    # TODO: rollback this hack
+                    from optimum.intel.openvino.configuration import _DEFAULT_4BIT_CONFIGS
+                    if args.model_id in _DEFAULT_4BIT_CONFIGS:
+                        print(f"Overriding default config for {args.model_id} with group size {args.group_size}.")
+                        _DEFAULT_4BIT_CONFIGS[args.model_id]["group_size"] = args.group_size
+                    else:
+                        quantization_config["group_size"] = args.group_size
             else:
                 quantization_config["bits"] = 8
             if "asym" in args.compress_weights_mode:
@@ -111,21 +120,24 @@ def main(args: Args):
             elif "sym" in args.compress_weights_mode:
                 quantization_config["sym"] = True
             if args.ratio is not None:
-                quantization_config["ratio"] = args.ratio
-        model_fn = lambda: OVModelForCausalLM.from_pretrained(
+                # TODO: rollback this hack
+                from optimum.intel.openvino.configuration import _DEFAULT_4BIT_CONFIGS
+                if args.model_id in _DEFAULT_4BIT_CONFIGS:
+                    print(f"Overriding default config for {args.model_id} with ratio {args.ratio}.")
+                    _DEFAULT_4BIT_CONFIGS[args.model_id]["ratio"] = args.ratio
+                else:
+                    quantization_config["ratio"] = args.ratio
+        model = OVModelForCausalLM.from_pretrained(
             args.model_id,
             export=True,
             # HF uses sdpa by default since torch>=2.1.1, which is not well supported by OV export.
             attn_implementation="eager",
             quantization_config=quantization_config,
-            compile=False
+            compile=False,
+            load_in_8bit=False,
         )
         if args.compress_weights_mode is None:
-            with patch('optimum.exporters.openvino.convert._MAX_UNCOMPRESSED_SIZE', float('inf')):
-                model = model_fn()
             compress_model_transformation(model.model)
-        else:
-            model = model_fn()
         model.save_pretrained(save_path)
         model = model.model
 
@@ -140,7 +152,7 @@ def main(args: Args):
     target_sparsity_by_scope = {}
     if args.up is not None:
         target_sparsity_by_scope[TargetScope(patterns=[infer_layer_name(args.model_id, 'up')])] = args.up
-    if args.gate is not None:
+    if args.gate is not None and "phi" not in args.model_id.lower():
         target_sparsity_by_scope[TargetScope(patterns=[infer_layer_name(args.model_id, 'gate')])] = args.gate
     if args.down is not None:
         target_sparsity_by_scope[TargetScope(patterns=[infer_layer_name(args.model_id, 'down')])] = args.down
@@ -170,15 +182,15 @@ def main(args: Args):
         # Openvino IR export.
         # This is a bit tricky here. We ensure the inference precision is in FP32 otherwise we will get errors
         # when exporting to IR.
-        for module in sparse_model.nncf.modules():
-            if isinstance(module, nncf.torch.quantization.layers.AsymmetricWeightsDecompressor) or \
-               isinstance(module, nncf.torch.quantization.layers.SymmetricWeightsDecompressor):
-                module.result_dtype = torch.float32
+        if hasattr(sparse_model, "nncf"):
+            for module in sparse_model.nncf.modules():
+                if isinstance(module, nncf.torch.quantization.layers.BaseWeightsDecompressor):
+                    module.result_dtype = torch.float32
         if args.compress_weights_mode is None:
             sparse_model = sparse_model.float()
         # Optimum-intel will do weight compression without asking user if the model is
         # larger than _MAX_UNCOMPRESSED_SIZE. Disable it so that we can export a float model.
-        with patch('optimum.exporters.openvino.convert._MAX_UNCOMPRESSED_SIZE', float('inf')):
+        with patch('optimum.exporters.openvino.__main__._MAX_UNCOMPRESSED_SIZE', float('inf')):
             export_from_model(
                 sparse_model, save_path, stateful=False, device=args.device,
                 compression_option='fp32',
