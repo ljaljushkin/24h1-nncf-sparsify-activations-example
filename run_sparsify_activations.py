@@ -109,6 +109,7 @@ def main(args: Args):
                     # TODO: rollback this hack
                     from optimum.intel.openvino.configuration import _DEFAULT_4BIT_CONFIGS
                     if args.model_id in _DEFAULT_4BIT_CONFIGS:
+                        print(f"Overriding default config for {args.model_id} with group size {args.group_size}.")
                         _DEFAULT_4BIT_CONFIGS[args.model_id]["group_size"] = args.group_size
                     else:
                         quantization_config["group_size"] = args.group_size
@@ -122,6 +123,7 @@ def main(args: Args):
                 # TODO: rollback this hack
                 from optimum.intel.openvino.configuration import _DEFAULT_4BIT_CONFIGS
                 if args.model_id in _DEFAULT_4BIT_CONFIGS:
+                    print(f"Overriding default config for {args.model_id} with ratio {args.ratio}.")
                     _DEFAULT_4BIT_CONFIGS[args.model_id]["ratio"] = args.ratio
                 else:
                     quantization_config["ratio"] = args.ratio

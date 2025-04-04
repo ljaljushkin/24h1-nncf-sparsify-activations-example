@@ -9,7 +9,7 @@ def c_to_p(s):
     # Comma to point
     return s.replace(",", ".")
 
-csv_file = "C:\\Users\\nsavelye\\Downloads\\dynamic_sparsity.csv"
+csv_file = "./dynamic_sparsity.csv"
 data = []
 with open(csv_file, 'r') as file:
     reader = csv.DictReader(file, ["model_id", "model_size", "weights", "int4_ratio", "group_size", "is_sparse",

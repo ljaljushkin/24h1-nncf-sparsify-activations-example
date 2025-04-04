@@ -3,7 +3,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-python_path = "/home/nsavel/venvs/llm_bench/bin/python"
+python_path = "/home/nsavel/venvs/llm_bench_dynsparse_20250/bin/python"
 benchmark_py_path = "/home/nsavel/workspace/openvino.genai/tools/llm_bench/benchmark.py"
 root_dir = Path("/media/hdd1/models/sparsity_08032025")
 report_file_name = "llm_bench_report_n3.json"
