@@ -71,7 +71,7 @@ natsort==8.4.0
 networkx==3.2.1
 ninja==1.11.1.1
 nltk==3.8.1
-nncf @ git+https://github.com/nikita-savelyevv/nncf.git@activation-sparsity-ov-backend
+# nncf @ git+https://github.com/nikita-savelyevv/nncf.git@activation-sparsity-ov-backend
 numba==0.60.0
 numexpr==2.10.1
 numpy==1.26.4

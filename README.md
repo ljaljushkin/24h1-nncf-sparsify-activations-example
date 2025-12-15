@@ -5,11 +5,12 @@
 Python 3.9+ is required.
 
 ```bash
-git clone https://github.com/nikita-savelyevv/nncf.git
-cd nncf && git checkout activation-sparsity-ov-backend && cd ..
-pip install -e nncf
+git clone https://github.com/nikita-savelyevv/nncf.git /tmp/nncf # install not inside repository to avoid import issues
+cd /tmp/nncf && git checkout activation-sparsity-ov-backend
+pip install -e .
+cd -
 pip install -r requirements.txt
-
+pip install pip==22.0 # to avoid issue with deprecation of --build-option in pip==23.0
 ```
 
 ## Run
