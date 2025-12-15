@@ -2,3 +2,4 @@ models/
 *.pyc
 playground*
 .idea
+.venv

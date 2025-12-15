@@ -71,7 +71,7 @@ natsort==8.4.0
 networkx==3.2.1
 ninja==1.11.1.1
 nltk==3.8.1
-nncf @ https://github.com/nikita-savelyevv/nncf.git@activation-sparsity-ov-backend
+nncf @ git+https://github.com/nikita-savelyevv/nncf.git@activation-sparsity-ov-backend
 numba==0.60.0
 numexpr==2.10.1
 numpy==1.26.4
@@ -95,7 +95,7 @@ openvino-genai==2025.0.0.0
 openvino-telemetry==2025.0.0
 openvino-tokenizers==2025.0.0.0
 optimum==1.24.0
-optimum-intel @ https://github.com/huggingface/optimum-intel.git@6e4bb3676f7e413b70aab52fabb75ac6660a2041
+optimum-intel @ git+https://github.com/huggingface/optimum-intel.git@6e4bb3676f7e413b70aab52fabb75ac6660a2041
 packaging==24.1
 pandas==2.2.2
 pathvalidate==3.2.0
