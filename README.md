@@ -70,3 +70,10 @@ To run llm_bench with a specific OpenVINO build (e.g., commit `19b53c43b67` from
 - The `OpenVINO_DIR` environment variable tells CMake where to find OpenVINO during build
 - The `LD_LIBRARY_PATH` environment variable tells the runtime where to find OpenVINO shared libraries
 
+```
+python benchmark.py -m=/home/nlyaly/projects/24h1-nncf-sparsify-activations-example/models/llama2-7b_int8-asym_sparse/ -rj int8_asym_sparse.json -n 3 -ic 128
+[ INFO ] [Average] P[0] Input token size: 8, 1st token latency: 203.80 ms/token, 2nd token latency: 119.38 ms/token, 2nd tokens throughput: 8.38 tokens/s
+
+python benchmark.py -m=/home/nlyaly/projects/24h1-nncf-sparsify-activations-example/models/llama2-7b_int8-asym/ -rj int8_asym.json -n 3 -ic 128
+ INFO ] [Average] P[0] Input token size: 8, 1st token latency: 160.02 ms/token, 2nd token latency: 136.60 ms/token, 2nd tokens throughput: 7.32 tokens/s
+```
